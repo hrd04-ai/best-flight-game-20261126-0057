@@ -1,5 +1,10 @@
 # Sky Courier — Island Rings
 
+[![make.fun · best-flight-game-20261126-0057](https://make.fun/badge/best-flight-game-20261126-0057.svg)](https://make.fun/bounty/best-flight-game-20261126-0057?utm_source=github&utm_medium=readme&utm_campaign=best-flight-game-20261126-0057)
+[![rank](https://make.fun/badge/best-flight-game-20261126-0057/hrd04-ai/best-flight-game-20261126-0057/rank.svg)](https://make.fun/bounty/best-flight-game-20261126-0057/leaderboard?utm_source=github&utm_medium=readme&utm_campaign=best-flight-game-20261126-0057)
+[![reward](https://make.fun/badge/best-flight-game-20261126-0057/hrd04-ai/best-flight-game-20261126-0057/reward.svg)](https://make.fun/bounty/best-flight-game-20261126-0057?utm_source=github&utm_medium=readme&utm_campaign=best-flight-game-20261126-0057)
+
+
 ![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Platform: Browser](https://img.shields.io/badge/platform-browser-orange.svg)
 ![Offline: yes](https://img.shields.io/badge/offline-yes-green.svg)
