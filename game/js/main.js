@@ -96,13 +96,12 @@
 
   function titleCamera(t) {
     var p = game.plane;
-    var ang = SC.rad(38 + (game.frozen ? 0 : Math.sin(t * 0.07) * 16));
-    var dist = 46;
-    var cx = p.x + Math.sin(ang) * dist;
-    var cy = p.y - Math.cos(ang) * dist;
-    var cz = p.z + 9;
-    // Look at the plane, island and volcano beyond it.
-    var dx = p.x - cx, dy = p.y - cy, dz = (p.z + 2) - cz;
+    // South-east of the parked Kestrel, looking north-west: plane in the
+    // foreground, runway running away, island and volcano behind.
+    var sway = game.frozen ? 0 : Math.sin(t * 0.07) * 10;
+    var cx = p.x + 34 + sway, cy = p.y - 50, cz = p.z + 17;
+    var lookX = p.x - 210, lookY = p.y + 300, lookZ = p.z + 8;
+    var dx = lookX - cx, dy = lookY - cy, dz = lookZ - cz;
     var heading = SC.deg(Math.atan2(dx, dy));
     var pitch = SC.deg(Math.atan2(dz, Math.hypot(dx, dy)));
     return { x: cx, y: cy, z: cz, heading: heading, pitch: pitch, roll: 0 };
@@ -230,7 +229,11 @@
   function drawTitle() {
     var cx = W / 2;
     ctx.textAlign = 'center';
-    ctx.fillStyle = 'rgba(6,14,24,0.42)';
+    var shade = ctx.createLinearGradient(0, 0, 0, H);
+    shade.addColorStop(0, 'rgba(6,14,24,0.38)');
+    shade.addColorStop(0.45, 'rgba(6,14,24,0.10)');
+    shade.addColorStop(1, 'rgba(6,14,24,0.22)');
+    ctx.fillStyle = shade;
     ctx.fillRect(0, 0, W, H);
     ctx.fillStyle = '#ffd23f';
     ctx.font = '900 ' + Math.round(Math.min(64, W * 0.055)) + 'px system-ui, sans-serif';
@@ -242,7 +245,7 @@
     ctx.fillStyle = '#bfe9ff';
     ctx.fillText('Fly the mail plane Kestrel: thread the delivery rings, then grease the landing.', cx, H * 0.16 + 68);
 
-    var boxW = Math.min(620, W * 0.86), boxX = cx - boxW / 2, boxY = H * 0.34;
+    var boxW = Math.min(560, W * 0.52), boxX = Math.max(24, W * 0.045), boxY = H * 0.50;
     ctx.fillStyle = 'rgba(8,18,28,0.66)';
     ctx.strokeStyle = 'rgba(140,220,255,0.4)';
     ctx.beginPath(); ctx.roundRect(boxX, boxY, boxW, 190, 12); ctx.fill(); ctx.stroke();

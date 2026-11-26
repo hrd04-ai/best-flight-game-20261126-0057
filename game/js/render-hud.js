@@ -141,8 +141,8 @@
     ctx.fillText(p.flaps ? 'FLAPS ▼' : 'FLAPS ▲', x + 100, y + 95);
   }
 
-  function missionBox(ctx, W, H, sortie, p, score) {
-    var w = 300, x = W - w - 18, y = H - 118;
+  function missionBox(ctx, W, H, sortie, p, score, topRight) {
+    var w = 300, x = W - w - 18, y = topRight ? 96 : H - 118;
     panel(ctx, x, y, w, 100);
     ctx.textAlign = 'left';
     ctx.fillStyle = '#ffd23f';
@@ -237,8 +237,13 @@
       reticle(ctx, W, H, p);
     }
     compassRibbon(ctx, W, H, p);
-    bars(ctx, W, H, p);
-    missionBox(ctx, W, H, sortie, p, state.liveScore);
+    if (state.view === 'cockpit') {
+      // The panel carries throttle/fuel/hull; keep the objective up top.
+      missionBox(ctx, W, H, sortie, p, state.liveScore, true);
+    } else {
+      bars(ctx, W, H, p);
+      missionBox(ctx, W, H, sortie, p, state.liveScore, false);
+    }
     var anyWarn = warnings(ctx, W, H, p, sortie, state.time);
     if (state.basis) ringPointer(ctx, W, H, state.camera, state.basis, state.focal, sortie);
     if (state.message && state.time < state.messageUntil) {

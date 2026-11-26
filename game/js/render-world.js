@@ -63,6 +63,16 @@
     ctx.fill();
   }
 
+  // Deterministic per-quad brightness so the island reads as terrain,
+  // not as a flat grid of identical tiles.
+  function shadeColor(hex, f) {
+    var n = parseInt(hex.slice(1), 16);
+    var r = Math.min(255, Math.round(((n >> 16) & 255) * f));
+    var g = Math.min(255, Math.round(((n >> 8) & 255) * f));
+    var b = Math.min(255, Math.round((n & 255) * f));
+    return 'rgb(' + r + ',' + g + ',' + b + ')';
+  }
+
   function drawSky(ctx, W, H, pal, cam, basis, focal, time) {
     var g = ctx.createLinearGradient(0, 0, 0, H);
     g.addColorStop(0, pal.skyTop);
@@ -88,39 +98,75 @@
       ctx.fillStyle = pal.sun;
       ctx.beginPath(); ctx.arc(sp.sx, sp.sy, sr * 0.55, 0, 6.2832); ctx.fill();
     }
-    // Clouds.
-    ctx.fillStyle = pal.cloud;
+    // Clouds: a soft base with a brighter crown so they read as puffs.
     for (var i = 0; i < clouds.length; i++) {
       var c = clouds[i];
       var cp = project(cam, basis, focal, W, H, c.x, c.y, c.z);
       if (cp.cz < 60 || cp.cz > 9000) continue;
       var wpx = (c.w / cp.cz) * focal;
       if (wpx < 6) continue;
+      ctx.fillStyle = pal.cloud;
       ctx.beginPath();
-      ctx.ellipse(cp.sx, cp.sy, wpx * 0.5, wpx * 0.13, 0, 0, 6.2832);
-      ctx.ellipse(cp.sx - wpx * 0.25, cp.sy + wpx * 0.03, wpx * 0.3, wpx * 0.09, 0, 0, 6.2832);
-      ctx.ellipse(cp.sx + wpx * 0.28, cp.sy + wpx * 0.02, wpx * 0.32, wpx * 0.1, 0, 0, 6.2832);
+      ctx.ellipse(cp.sx, cp.sy, wpx * 0.5, wpx * 0.14, 0, 0, 6.2832);
+      ctx.ellipse(cp.sx - wpx * 0.26, cp.sy + wpx * 0.03, wpx * 0.3, wpx * 0.10, 0, 0, 6.2832);
+      ctx.ellipse(cp.sx + wpx * 0.28, cp.sy + wpx * 0.02, wpx * 0.32, wpx * 0.11, 0, 0, 6.2832);
+      ctx.fill();
+      ctx.fillStyle = pal.duskFactor ? 'rgba(255,215,190,0.55)' : 'rgba(255,255,255,0.75)';
+      ctx.beginPath();
+      ctx.ellipse(cp.sx - wpx * 0.08, cp.sy - wpx * 0.06, wpx * 0.30, wpx * 0.10, 0, 0, 6.2832);
       ctx.fill();
     }
   }
 
+  // Camera-space coordinates of a world point (before the perspective divide).
+  function toCam(cam, basis, x, y, z) {
+    var dx = x - cam.x, dy = y - cam.y, dz = z - cam.z;
+    return {
+      cx: dx * basis.right.x + dy * basis.right.y + dz * basis.right.z,
+      cy: dx * basis.up.x + dy * basis.up.y + dz * basis.up.z,
+      cz: dx * basis.f.x + dy * basis.f.y + dz * basis.f.z
+    };
+  }
+
+  // Clip a camera-space polygon against the near plane (cz >= near).
+  function clipNear(polyPts, near) {
+    var out = [];
+    for (var i = 0; i < polyPts.length; i++) {
+      var cur = polyPts[i], prev = polyPts[(i + polyPts.length - 1) % polyPts.length];
+      var curIn = cur.cz >= near, prevIn = prev.cz >= near;
+      if (curIn !== prevIn) {
+        var t = (near - prev.cz) / (cur.cz - prev.cz);
+        out.push({
+          cx: prev.cx + (cur.cx - prev.cx) * t,
+          cy: prev.cy + (cur.cy - prev.cy) * t,
+          cz: near
+        });
+      }
+      if (curIn) out.push(cur);
+    }
+    return out;
+  }
+
   function drawSea(ctx, W, H, pal, cam, basis, focal) {
     var ext = 9000;
-    var corners = [
-      project(cam, basis, focal, W, H, cam.x - ext, cam.y - ext, 0),
-      project(cam, basis, focal, W, H, cam.x + ext, cam.y - ext, 0),
-      project(cam, basis, focal, W, H, cam.x + ext, cam.y + ext, 0),
-      project(cam, basis, focal, W, H, cam.x - ext, cam.y + ext, 0)
+    var raw = [
+      toCam(cam, basis, cam.x - ext, cam.y - ext, 0),
+      toCam(cam, basis, cam.x + ext, cam.y - ext, 0),
+      toCam(cam, basis, cam.x + ext, cam.y + ext, 0),
+      toCam(cam, basis, cam.x - ext, cam.y + ext, 0)
     ];
-    var visible = corners.filter(function (c) { return c.cz > 1; });
-    if (visible.length < 2) return;
+    var clipped = clipNear(raw, cfg.camera.near);
+    if (clipped.length < 3) return;
     var g = ctx.createLinearGradient(0, H * 0.45, 0, H);
     g.addColorStop(0, pal.seaFar);
     g.addColorStop(1, pal.sea);
     ctx.fillStyle = g;
     ctx.beginPath();
-    ctx.moveTo(corners[0].sx, corners[0].sy);
-    for (var i = 1; i < 4; i++) ctx.lineTo(corners[i].sx, corners[i].sy);
+    clipped.forEach(function (c, i) {
+      var sx = W / 2 + (c.cx / c.cz) * focal;
+      var sy = H / 2 - (c.cy / c.cz) * focal;
+      if (i === 0) ctx.moveTo(sx, sy); else ctx.lineTo(sx, sy);
+    });
     ctx.closePath();
     ctx.fill();
   }
@@ -144,17 +190,30 @@
         if (hMax <= 0.25) continue;
         var pa = proj[a], pb = proj[b], pc = proj[c], pd = proj[d];
         var czAvg = (pa.cz + pb.cz + pc.cz + pd.cz) / 4;
-        if (czAvg < cfg.camera.near || czAvg > 7500) continue;
-        if (pa.cz < 1 || pb.cz < 1 || pc.cz < 1 || pd.cz < 1) continue;
+        if (czAvg > 7500) continue;
+        // Clip against the near plane so ground under the camera never
+        // leaves a hole; fully-behind quads drop out here.
+        var clipped = clipNear([pa, pb, pd, pc], cfg.camera.near);
+        if (clipped.length < 3) continue;
+        var pts = clipped.map(function (cp) {
+          return { sx: W / 2 + (cp.cx / cp.cz) * focal, sy: H / 2 - (cp.cy / cp.cz) * focal };
+        });
         // Screen-space cull.
-        var minX = Math.min(pa.sx, pb.sx, pc.sx, pd.sx), maxX = Math.max(pa.sx, pb.sx, pc.sx, pd.sx);
-        var minY = Math.min(pa.sy, pb.sy, pc.sy, pd.sy), maxY = Math.max(pa.sy, pb.sy, pc.sy, pd.sy);
+        var minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+        for (var s = 0; s < pts.length; s++) {
+          if (pts[s].sx < minX) minX = pts[s].sx;
+          if (pts[s].sx > maxX) maxX = pts[s].sx;
+          if (pts[s].sy < minY) minY = pts[s].sy;
+          if (pts[s].sy > maxY) maxY = pts[s].sy;
+        }
         if (maxX < -40 || minX > W + 40 || maxY < -40 || minY > H + 40) continue;
         var hAvg = (heights[a] + heights[b] + heights[c] + heights[d]) / 4;
         var slope = Math.abs(heights[b] - heights[a]) / cell + Math.abs(heights[c] - heights[a]) / cell;
+        var hash = ((i * 73 + j * 149) % 9) / 9; // 0..1 stable per cell
+        var baseCol = terrain.terrainColor(hAvg, slope, -ext + (i + 0.5) * cell, -ext + (j + 0.5) * cell, pal);
         quads.push({
-          pts: [pa, pb, pd, pc], cz: czAvg,
-          color: terrain.terrainColor(hAvg, slope, -ext + (i + 0.5) * cell, -ext + (j + 0.5) * cell, pal)
+          pts: pts, cz: czAvg,
+          color: shadeColor(baseCol, 0.955 + hash * 0.09)
         });
       }
     }
@@ -164,13 +223,17 @@
 
   function runwayQuad(ctx, W, H, cam, basis, focal, along0, along1, across0, across1, fill) {
     var rw = cfg.runway;
-    var pts = [
-      project(cam, basis, focal, W, H, rw.cx + along0, rw.cy + across0, rw.elev + 0.15),
-      project(cam, basis, focal, W, H, rw.cx + along1, rw.cy + across0, rw.elev + 0.15),
-      project(cam, basis, focal, W, H, rw.cx + along1, rw.cy + across1, rw.elev + 0.15),
-      project(cam, basis, focal, W, H, rw.cx + along0, rw.cy + across1, rw.elev + 0.15)
+    var raw = [
+      toCam(cam, basis, rw.cx + along0, rw.cy + across0, rw.elev + 0.15),
+      toCam(cam, basis, rw.cx + along1, rw.cy + across0, rw.elev + 0.15),
+      toCam(cam, basis, rw.cx + along1, rw.cy + across1, rw.elev + 0.15),
+      toCam(cam, basis, rw.cx + along0, rw.cy + across1, rw.elev + 0.15)
     ];
-    for (var i = 0; i < 4; i++) if (pts[i].cz < 1) return;
+    var clipped = clipNear(raw, cfg.camera.near);
+    if (clipped.length < 3) return;
+    var pts = clipped.map(function (c) {
+      return { sx: W / 2 + (c.cx / c.cz) * focal, sy: H / 2 - (c.cy / c.cz) * focal };
+    });
     poly(ctx, pts, fill);
   }
 
@@ -405,8 +468,10 @@
     var pp = project(cam, basis, focal, W, H, plane.x, plane.y, plane.z);
     if (pp.cz < 2) return;
     if (sh.cz > 2) {
-      var shr = Math.max(3, (7 / sh.cz) * focal);
-      ctx.fillStyle = 'rgba(10,20,15,0.35)';
+      var agl = Math.max(0, plane.z - gz);
+      var shr = Math.max(3, ((5.5 + agl * 0.05) / sh.cz) * focal);
+      var shAlpha = SC.clamp(0.38 - agl * 0.0035, 0.06, 0.38);
+      ctx.fillStyle = 'rgba(10,20,15,' + shAlpha.toFixed(3) + ')';
       ctx.beginPath(); ctx.ellipse(sh.sx, sh.sy, shr, shr * 0.32, 0, 0, 6.2832); ctx.fill();
     }
     var s = focal / pp.cz; // pixels per metre at the plane

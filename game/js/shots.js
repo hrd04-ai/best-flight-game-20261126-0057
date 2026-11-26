@@ -15,20 +15,20 @@
     return null;
   }
 
-  // Place the plane mid-sortie-1, banked gently toward the next gold ring
-  // with the island, volcano and lighthouse spread out ahead.
+  // Place the plane on sortie 2's climb toward the volcano ring: the gold
+  // ring hangs in front of the smoking cone, coast and sea spread below.
   function stageAirborne(game, view) {
-    game.startSortie(0);
+    game.startSortie(1);
     var p = game.plane;
-    p.x = -420; p.y = -1150; p.z = 175;
-    p.heading = 62; p.pitch = 3; p.roll = -14;
-    p.speed = 56; p.vspeed = 2.2; p.throttle = 0.72;
+    p.x = -600; p.y = 720; p.z = 488;
+    p.heading = 303; p.pitch = -1; p.roll = -13;
+    p.speed = 54; p.vspeed = 3.1; p.throttle = 0.78;
     p.gearDown = false; p.flaps = false; p.onGround = false;
-    p.fuel = 86; p.hull = 100;
-    // First ring already collected so the counter reads 1/5.
-    game.sortie.rings[0].passed = true;
-    game.sortie.ringsDone = 1;
-    game.sortie.elapsed = 47;
+    p.fuel = 74; p.hull = 100;
+    // Four rings already collected; the volcano ring is next (5/7).
+    for (var i = 0; i < 4; i++) game.sortie.rings[i].passed = true;
+    game.sortie.ringsDone = 4;
+    game.sortie.elapsed = 152;
     game.view = view;
     game.screen = 'fly';
     game.snapCamera();
@@ -39,7 +39,7 @@
     game.startSortie(0);
     var p = game.plane;
     var rw = cfg.runway;
-    p.x = rw.cx - 1500; p.y = rw.cy + 6; p.z = rw.elev + 62;
+    p.x = rw.cx - 680; p.y = rw.cy + 4; p.z = rw.elev + 19;
     p.heading = 90; p.pitch = -3; p.roll = 2;
     p.speed = 33; p.vspeed = -2.4; p.throttle = 0.34;
     p.gearDown = true; p.flaps = true; p.onGround = false;
